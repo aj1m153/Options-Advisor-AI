@@ -22,24 +22,92 @@ from collections import Counter
 
 warnings.filterwarnings("ignore")
 
-# ── Utility modules ───────────────────────────────────────────────────────────
+# ── Path resolution — works locally, on Streamlit Cloud, and Docker ──────────
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from utils.finbert    import load_finbert_pipeline, analyze_sentiment, TRANSFORMERS_AVAILABLE
-from utils.shap_utils import compute_shap, plot_shap_waterfall, SHAP_AVAILABLE, FEAT_LABELS
-from utils.iv_fetcher import fetch_polygon_iv, fetch_vix
-from utils.backtester import (
-    backtest, plot_equity_curve, plot_trade_pnl_bar, plot_drawdown,
-    SUPPORTED_STRATEGIES, SCIPY_AVAILABLE,
-)
-from utils.alpaca_trader import (
-    get_client as alpaca_get_client,
-    get_account, get_positions, get_orders,
-    place_market_order, place_limit_order,
-    cancel_all_orders, close_position,
-    ALPACA_AVAILABLE,
-)
+# Always add the directory containing this file so `utils/` is importable
+# regardless of the current working directory.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+# Fallback: also add the parent directory.
+_PARENT = os.path.dirname(_HERE)
+if _PARENT not in sys.path:
+    sys.path.insert(0, _PARENT)
+
+def _stub(*a, **kw):
+    return None
+
+# FinBERT ─────────────────────────────────────────────────────────────────────
+try:
+    from utils.finbert import load_finbert_pipeline, analyze_sentiment, TRANSFORMERS_AVAILABLE
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+    load_finbert_pipeline = _stub
+    def analyze_sentiment(headlines, pipe=None, **kw):
+        pos = {"surge","beat","record","growth","profit","rise","gain","strong",
+               "bullish","upgrade","buy","soar","rally"}
+        neg = {"drop","fall","miss","loss","weak","cut","bearish","downgrade",
+               "sell","crash","decline","warn"}
+        details, scores = [], []
+        for h in (headlines or []):
+            words = set(h.lower().split())
+            p = len(words & pos); n = len(words & neg); d = max(p+n,1)
+            sv = (p-n)/d
+            details.append({
+                "headline":h,
+                "label":"positive" if sv>0 else ("negative" if sv<0 else "neutral"),
+                "positive":max(sv,0),"negative":max(-sv,0),
+                "neutral":1-abs(sv),"sentiment":sv,
+            })
+            scores.append(sv)
+        avg = float(sum(scores)/len(scores)) if scores else 0.0
+        return {"score":round(avg,4),
+                "label":"positive" if avg>.12 else ("negative" if avg<-.12 else "neutral"),
+                "method":"keyword","details":details}
+
+# SHAP ────────────────────────────────────────────────────────────────────────
+try:
+    from utils.shap_utils import compute_shap, plot_shap_waterfall, SHAP_AVAILABLE, FEAT_LABELS
+except ImportError:
+    SHAP_AVAILABLE = False
+    compute_shap = lambda *a, **kw: (None, None)
+    plot_shap_waterfall = _stub
+    FEAT_LABELS = {}
+
+# Polygon IV ──────────────────────────────────────────────────────────────────
+try:
+    from utils.iv_fetcher import fetch_polygon_iv, fetch_vix
+except ImportError:
+    fetch_polygon_iv = _stub
+    fetch_vix = _stub
+
+# Backtester ──────────────────────────────────────────────────────────────────
+try:
+    from utils.backtester import (
+        backtest, plot_equity_curve, plot_trade_pnl_bar, plot_drawdown,
+        SUPPORTED_STRATEGIES, SCIPY_AVAILABLE,
+    )
+except ImportError:
+    SCIPY_AVAILABLE = False
+    SUPPORTED_STRATEGIES = []
+    def backtest(*a, **kw):
+        return {"error": "scipy not installed. Run: pip install scipy"}
+    plot_equity_curve = plot_trade_pnl_bar = plot_drawdown = _stub
+
+# Alpaca ──────────────────────────────────────────────────────────────────────
+try:
+    from utils.alpaca_trader import (
+        get_client as alpaca_get_client,
+        get_account, get_positions, get_orders,
+        place_market_order, place_limit_order,
+        cancel_all_orders, close_position,
+        ALPACA_AVAILABLE,
+    )
+except ImportError:
+    ALPACA_AVAILABLE = False
+    alpaca_get_client = get_account = get_positions = get_orders = _stub
+    place_market_order = place_limit_order = cancel_all_orders = close_position = _stub
 
 # ─────────────────────────────────────────────────────────────
 #  PAGE CONFIG & STYLES
