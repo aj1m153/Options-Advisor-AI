@@ -1,24 +1,13 @@
-# ── Core ───────────────────────────────────────
+--extra-index-url https://download.pytorch.org/whl/cpu
 streamlit>=1.32.0
 yfinance>=0.2.38
 pandas>=2.0.0
 numpy>=1.26.0
 plotly>=5.20.0
 scikit-learn>=1.4.0
-
-# ── Upgrade 1: FinBERT NLP Sentiment ───────────
-# Downloads ProsusAI/finbert (~440 MB) on first run
+requests>=2.31.0
+scipy>=1.12.0
+shap>=0.44.0
 transformers>=4.38.0
 torch>=2.2.0
-
-# ── Upgrade 2: SHAP Explainability ─────────────
-shap>=0.44.0
-
-# ── Upgrade 3: Polygon.io IV ───────────────────
-requests>=2.31.0
-
-# ── Upgrade 4: Black-Scholes Backtester ────────
-scipy>=1.12.0
-
-# ── Upgrade 5: Alpaca Paper Trading ────────────
 alpaca-py>=0.25.0
